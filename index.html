@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Derivative Visualizer</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d2e;
+    --border: #2a2d3e;
+    --accent: #7c6af7;
+    --accent2: #f7a26a;
+    --accent3: #6af7b8;
+    --text: #e8eaf6;
+    --muted: #7b7f9e;
+    --f-color: #7c6af7;
+    --f1-color: #f7a26a;
+    --f2-color: #6af7b8;
+    --tan-color: #ffffff;
+    --max-color: #f76a6a;
+    --min-color: #6ab4f7;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 18px 28px 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  header h1 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  .input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    flex-wrap: wrap;
+  }
+
+  .input-label {
+    font-size: 0.9rem;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  #eq-input {
+    flex: 1;
+    min-width: 200px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 1rem;
+    font-family: 'Courier New', monospace;
+    padding: 8px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  #eq-input:focus { border-color: var(--accent); }
+
+  #plot-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 22px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.2s;
+  }
+  #plot-btn:hover { opacity: 0.85; }
+
+  .range-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .range-row label { font-size: 0.82rem; color: var(--muted); }
+  .zoom-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 1rem;
+    width: 30px; height: 30px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s;
+    flex-shrink: 0;
+  }
+  .zoom-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  #reset-btn {
+    background: #3a2a6e;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    color: #c4b8ff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0 14px;
+    height: 30px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  #reset-btn:hover { background: var(--accent); color: #fff; }
+  .range-row input[type=number] {
+    width: 70px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.85rem;
+    padding: 5px 8px;
+    outline: none;
+  }
+
+  #error-msg {
+    color: #f76a6a;
+    font-size: 0.82rem;
+    padding: 0 28px 6px;
+    min-height: 20px;
+  }
+
+  .charts-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 10px 8px;
+    overflow: hidden;
+    min-height: 0;
+    gap: 6px;
+  }
+
+  .info-bar {
+    width: 100%;
+    max-width: 880px;
+    padding: 6px 12px;
+    gap: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+  }
+
+  /* 2×2 grid: top-left=f, top-right=f', bottom-left=f', bottom-right=f'' */
+  .grid-2x2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+    max-width: 880px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .cell {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+  }
+
+  .chart-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0 2px 3px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .chart-label .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+  canvas {
+    display: block;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+    aspect-ratio: 1 / 1;
+    height: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    cursor: crosshair;
+  }
+  .info-item { display: flex; flex-direction: column; gap: 2px; }
+  .info-item .lbl { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .info-item .val { font-family: 'Courier New', monospace; font-size: 0.95rem; }
+  .info-item .val.f-col  { color: var(--f-color); }
+  .info-item .val.f1-col { color: var(--f1-color); }
+  .info-item .val.f2-col { color: var(--f2-color); }
+  .info-item .val.note   { color: var(--muted); font-size: 0.8rem; font-family: inherit; }
+
+  .legend-row {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    padding: 4px 4px 8px;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .legend-row span { display: flex; align-items: center; gap: 5px; }
+  .legend-row .line { display: inline-block; width: 18px; height: 2px; border-radius: 2px; }
+  .legend-row .dashed { border-top: 2px dashed; width: 18px; height: 0; }
+
+  .presets {
+    display: flex;
+    gap: 7px;
+    flex-wrap: wrap;
+    padding: 4px 28px 8px;
+  }
+  .preset-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover { border-color: var(--accent); color: var(--text); }
+
+  .critical-table {
+    font-size: 0.78rem;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 0 4px 4px;
+    color: var(--muted);
+  }
+  .ct-item { display: flex; align-items: center; gap: 5px; }
+  .ct-dot { width: 8px; height: 8px; border-radius: 50%; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>&#8706; Derivative Visualizer</h1>
+  <div class="input-row">
+    <span class="input-label">f(x) =</span>
+    <input id="eq-input" type="text" value="x^3 - 3*x" autocomplete="off" spellcheck="false" />
+    <button id="plot-btn">Plot</button>
+  </div>
+  <div class="range-row">
+    <label>x from</label>
+    <input id="x-min" type="number" value="-4" step="0.5" />
+    <label>to</label>
+    <input id="x-max" type="number" value="4" step="0.5" />
+    <button class="zoom-btn" id="zoom-in"  title="Zoom in">＋</button>
+    <button class="zoom-btn" id="zoom-out" title="Zoom out">－</button>
+    <button id="reset-btn" title="Reset view to default">Reset</button>
+  </div>
+</header>
+
+<div id="error-msg"></div>
+
+<div class="presets">
+  <button class="preset-btn" data-eq="x^3 - 3*x">x³ - 3x</button>
+  <button class="preset-btn" data-eq="sin(x)">sin(x)</button>
+  <button class="preset-btn" data-eq="cos(x)">cos(x)</button>
+  <button class="preset-btn" data-eq="x^4 - 4*x^2">x⁴ - 4x²</button>
+  <button class="preset-btn" data-eq="exp(-x^2)">e^(-x²)</button>
+  <button class="preset-btn" data-eq="x^2 * sin(x)">x² sin(x)</button>
+  <button class="preset-btn" data-eq="log(abs(x)+0.01)">ln|x|</button>
+  <button class="preset-btn" data-eq="1/(1+exp(-x))">sigmoid</button>
+  <button class="preset-btn" data-eq="x^5 - 5*x^3 + 4*x">x⁵-5x³+4x</button>
+  <button class="preset-btn" data-eq="tan(x)">tan(x)</button>
+</div>
+
+<div class="charts-wrapper">
+
+  <div class="info-bar" id="info-bar">
+    <div class="info-item">
+      <span class="lbl">x</span>
+      <span class="val" id="info-x">—</span>
+    </div>
+    <div class="info-item">
+      <span class="lbl">f(x)</span>
+      <span class="val f-col" id="info-f">—</span>
+    </div>
+    <div class="info-item">
+      <span class="lbl">f&#8242;(x) = slope of f</span>
+      <span class="val f1-col" id="info-f1">—</span>
+    </div>
+    <div class="info-item">
+      <span class="lbl">f&#8243;(x) = slope of f&#8242;</span>
+      <span class="val f2-col" id="info-f2">—</span>
+    </div>
+    <div class="info-item">
+      <span class="lbl">Critical point?</span>
+      <span class="val note" id="info-note">hover over graphs</span>
+    </div>
+  </div>
+
+  <div class="grid-2x2">
+
+    <!-- top-left: f(x) -->
+    <div class="cell">
+      <div class="chart-label">
+        <span class="dot" style="background:var(--f-color)"></span>
+        f(x) — original function
+      </div>
+      <canvas id="canvas-f"></canvas>
+    </div>
+
+    <!-- top-right: f'(x) -->
+    <div class="cell">
+      <div class="chart-label">
+        <span class="dot" style="background:var(--f1-color)"></span>
+        f&#8242;(x) — first derivative
+      </div>
+      <canvas id="canvas-f1a"></canvas>
+    </div>
+
+    <!-- bottom-left: f'(x) again -->
+    <div class="cell">
+      <div class="chart-label">
+        <span class="dot" style="background:var(--f1-color)"></span>
+        f&#8242;(x) — first derivative
+      </div>
+      <canvas id="canvas-f1b"></canvas>
+    </div>
+
+    <!-- bottom-right: f''(x) -->
+    <div class="cell">
+      <div class="chart-label">
+        <span class="dot" style="background:var(--f2-color)"></span>
+        f&#8243;(x) — second derivative
+      </div>
+      <canvas id="canvas-f2"></canvas>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ─── Math parser (safe eval with common math functions) ───────────────────────
+const mathScope = {
+  sin: Math.sin, cos: Math.cos, tan: Math.tan,
+  asin: Math.asin, acos: Math.acos, atan: Math.atan, atan2: Math.atan2,
+  sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh,
+  exp: Math.exp, log: Math.log, log2: Math.log2, log10: Math.log10,
+  sqrt: Math.sqrt, cbrt: Math.cbrt, abs: Math.abs,
+  pow: Math.pow, sign: Math.sign, ceil: Math.ceil, floor: Math.floor,
+  round: Math.round, PI: Math.PI, E: Math.E, pi: Math.PI, e: Math.E,
+};
+
+function parseEquation(raw) {
+  let expr = raw
+    // ── Unicode minus sign → ASCII hyphen
+    .replace(/\u2212/g, '-')
+    // ── Unicode superscripts → ^n
+    .replace(/\u00B2/g, '^2')   // ²
+    .replace(/\u00B3/g, '^3')   // ³
+    .replace(/\u2074/g, '^4')   // ⁴
+    .replace(/\u2075/g, '^5')   // ⁵
+    .replace(/\u2076/g, '^6')   // ⁶
+    .replace(/\u2077/g, '^7')   // ⁷
+    .replace(/\u2078/g, '^8')   // ⁸
+    .replace(/\u2079/g, '^9')   // ⁹
+    // ── Unicode dot / times → *
+    .replace(/\u00B7/g, '*')    // ·
+    .replace(/\u00D7/g, '*')    // ×
+    // ── Common function aliases
+    .replace(/\bln\b/gi, 'log')
+    .replace(/\barcsin\b/gi, 'asin')
+    .replace(/\barccos\b/gi, 'acos')
+    .replace(/\barctan\b/gi, 'atan')
+    .replace(/\btg\b/g, 'tan')
+    .replace(/\bpi\b/gi, 'PI')
+    // ── ^ → **
+    .replace(/\^/g, '**')
+    // ── Implicit multiplication:  2x  2(  )x  )(  x(  )sin etc.
+    // Must not split known function names like log2, log10
+    .replace(/(\d)(x\b|\()/g, '$1*$2')       // 2x → 2*x,  2( → 2*(  (digit before x or open paren)
+    .replace(/(\))([a-zA-Z0-9(])/g, '$1*$2') // )x → )*x,  )( → )*(
+    // ── bare 'e' not inside a word → E
+    .replace(/(?<![a-zA-Z])e(?![a-zA-Z])/g, 'E');
+
+  // eslint-disable-next-line no-new-func
+  return new Function('x', 'scope', `
+    "use strict";
+    const { sin, cos, tan, asin, acos, atan, atan2,
+            sinh, cosh, tanh,
+            exp, log, log2, log10,
+            sqrt, cbrt, abs, pow, sign,
+            ceil, floor, round, PI, E } = scope;
+    const pi = PI, ln = log, e = E;
+    return (${expr});
+  `);
+}
+
+function evalFn(fn, x) {
+  try {
+    const v = fn(x, mathScope);
+    return isFinite(v) ? v : NaN;
+  } catch { return NaN; }
+}
+
+// Numerical derivative via central difference
+function derivative(fn, x, h = 1e-5) {
+  return (evalFn(fn, x + h) - evalFn(fn, x - h)) / (2 * h);
+}
+function derivative2(fn, x, h = 1e-5) {
+  return (evalFn(fn, x + h) - 2 * evalFn(fn, x) + evalFn(fn, x - h)) / (h * h);
+}
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let fn = null;
+let xMin = -4, xMax = 4;
+let mouseX = null;
+let criticalPoints = [];
+
+// ─── Canvas setup ─────────────────────────────────────────────────────────────
+const canvases = {
+  f:   document.getElementById('canvas-f'),
+  f1a: document.getElementById('canvas-f1a'),
+  f1b: document.getElementById('canvas-f1b'),
+  f2:  document.getElementById('canvas-f2'),
+};
+const ctxs = {
+  f:   canvases.f.getContext('2d'),
+  f1a: canvases.f1a.getContext('2d'),
+  f1b: canvases.f1b.getContext('2d'),
+  f2:  canvases.f2.getContext('2d'),
+};
+
+function resizeCanvas(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  canvas.width  = rect.width  * devicePixelRatio;
+  canvas.height = rect.height * devicePixelRatio;
+}
+function resizeAll() {
+  Object.values(canvases).forEach(resizeCanvas);
+  if (fn) drawAll();
+}
+window.addEventListener('resize', resizeAll);
+
+// ─── Data sampling ────────────────────────────────────────────────────────────
+function sampleData(evalCb, n = 1200) {
+  const xs = [], ys = [];
+  for (let i = 0; i <= n; i++) {
+    const x = xMin + (xMax - xMin) * i / n;
+    xs.push(x);
+    ys.push(evalCb(x));
+  }
+  return { xs, ys };
+}
+
+// ─── Critical points detection ────────────────────────────────────────────────
+function findCriticalPoints() {
+  const pts = [];
+  const n = 2000;
+  let prevD = null;
+  let prevX = null;
+  for (let i = 0; i <= n; i++) {
+    const x = xMin + (xMax - xMin) * i / n;
+    const d = derivative(fn, x);
+    if (prevD !== null && isFinite(d) && isFinite(prevD)) {
+      if (prevD * d <= 0) {
+        // sign change → critical point between prevX and x
+        // bisect
+        let lo = prevX, hi = x;
+        for (let k = 0; k < 30; k++) {
+          const mid = (lo + hi) / 2;
+          const dm = derivative(fn, mid);
+          if (prevD * dm <= 0) hi = mid; else lo = mid;
+        }
+        const cx = (lo + hi) / 2;
+        const d2 = derivative2(fn, cx);
+        let type = 'inflection';
+        if (Math.abs(derivative(fn, cx)) < 1e-4) {
+          if (d2 > 0.001)       type = 'local min';
+          else if (d2 < -0.001) type = 'local max';
+          else                  type = 'saddle / inflection';
+        }
+        const fx = evalFn(fn, cx);
+        if (isFinite(fx)) pts.push({ x: cx, type, fx });
+      }
+    }
+    prevD = d; prevX = x;
+  }
+  // Find global max/min among candidates
+  let gmax = -Infinity, gmin = Infinity;
+  pts.forEach(p => { if (p.fx > gmax) gmax = p.fx; if (p.fx < gmin) gmin = p.fx; });
+  pts.forEach(p => {
+    if (p.type === 'local max' && Math.abs(p.fx - gmax) < 1e-6) p.type = 'global max';
+    if (p.type === 'local min' && Math.abs(p.fx - gmin) < 1e-6) p.type = 'global min';
+  });
+  return pts;
+}
+
+// ─── Shared y-center (single value — all three plots use identical scale) ──────
+// y-range = x-range (1:1). All plots share the same y-window so values are
+// directly comparable: if f'(x) is small it looks small relative to f(x).
+let yCenter = 0;
+
+function midOf(vals) {
+  const valid = vals.filter(isFinite);
+  if (!valid.length) return 0;
+  return (Math.min(...valid) + Math.max(...valid)) / 2;
+}
+
+function initYCenters() {
+  // Centre on f(x)'s midpoint — all three plots inherit this window
+  const n = 400;
+  const fYs = [];
+  for (let i = 0; i <= n; i++) {
+    const x = xMin + (xMax - xMin) * i / n;
+    fYs.push(evalFn(fn, x));
+  }
+  yCenter = midOf(fYs);
+}
+
+function getYBounds() {
+  const half = (xMax - xMin) / 2;
+  return { y0: yCenter - half, y1: yCenter + half };
+}
+
+// ─── Coordinate transforms ────────────────────────────────────────────────────
+function buildTransform(canvas) {
+  const W = canvas.width, H = canvas.height;
+  const { y0, y1 } = getYBounds();
+  const toCanvasX = x  => W * (x  - xMin) / (xMax - xMin);
+  const toCanvasY = y  => H - H * (y  - y0) / (y1 - y0);
+  const toDataX   = cx => xMin + (cx / W) * (xMax - xMin);
+  const toDataY   = cy => y0 + (1 - cy / H) * (y1 - y0);
+  return { W, H, yMin: y0, yMax: y1, toCanvasX, toCanvasY, toDataX, toDataY };
+}
+
+// ─── Grid helpers ─────────────────────────────────────────────────────────────
+function niceStep(range) {
+  const rough = range / 10;
+  const power = Math.pow(10, Math.floor(Math.log10(Math.max(rough, 1e-10))));
+  const norm  = rough / power;
+  if (norm < 1.5) return power;
+  if (norm < 3.5) return 2 * power;
+  if (norm < 7.5) return 5 * power;
+  return 10 * power;
+}
+function fmtN(v) {
+  if (Math.abs(v) < 1e-9) return '0';
+  const s = parseFloat(v.toPrecision(4)).toString();
+  return s;
+}
+
+// ─── Drawing helpers ──────────────────────────────────────────────────────────
+function drawGrid(ctx, T) {
+  const { W, H, yMin, yMax } = T;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#1a1d2e';
+  ctx.fillRect(0, 0, W, H);
+
+  const xRange = xMax - xMin;
+  const yRange = yMax - yMin;
+  const xStep  = niceStep(xRange);
+  const yStep  = niceStep(yRange);
+
+  const fs = 10 * devicePixelRatio;
+  ctx.font = `${fs}px 'Courier New', monospace`;
+
+  // ── Minor grid (every unit step)
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth   = 1;
+
+  let x = Math.ceil(xMin / xStep) * xStep;
+  for (; x <= xMax + 1e-9; x += xStep) {
+    const cx = T.toCanvasX(x);
+    ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke();
+  }
+  let y = Math.ceil(yMin / yStep) * yStep;
+  for (; y <= yMax + 1e-9; y += yStep) {
+    const cy = T.toCanvasY(y);
+    ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(W, cy); ctx.stroke();
+  }
+
+  // ── Axes (x=0 and y=0) — brighter
+  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+  ctx.lineWidth   = 1.5 * devicePixelRatio;
+  if (xMin <= 0 && xMax >= 0) {
+    const cx0 = T.toCanvasX(0);
+    ctx.beginPath(); ctx.moveTo(cx0, 0); ctx.lineTo(cx0, H); ctx.stroke();
+  }
+  if (yMin <= 0 && yMax >= 0) {
+    const cy0 = T.toCanvasY(0);
+    ctx.beginPath(); ctx.moveTo(0, cy0); ctx.lineTo(W, cy0); ctx.stroke();
+  }
+
+  // ── Labels
+  ctx.fillStyle  = 'rgba(123,127,158,0.85)';
+  const pad      = 3 * devicePixelRatio;
+  const labelPad = 18 * devicePixelRatio; // margin from edge so labels don't clip
+
+  // Anchor positions for labels
+  const cy0vis = (yMin <= 0 && yMax >= 0) ? T.toCanvasY(0) : H - labelPad;
+  const cx0vis = (xMin <= 0 && xMax >= 0) ? T.toCanvasX(0) : labelPad;
+
+  // X-axis tick labels (drawn just below the x-axis line)
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'top';
+  x = Math.ceil(xMin / xStep) * xStep;
+  for (; x <= xMax + 1e-9; x += xStep) {
+    if (Math.abs(x) < xStep * 0.01) continue; // skip 0
+    const cx = T.toCanvasX(x);
+    const labelY = Math.min(cy0vis + pad, H - labelPad);
+    ctx.fillText(fmtN(x), cx, labelY);
+  }
+
+  // Y-axis tick labels (drawn just left of the y-axis line)
+  ctx.textAlign    = 'right';
+  ctx.textBaseline = 'middle';
+  y = Math.ceil(yMin / yStep) * yStep;
+  for (; y <= yMax + 1e-9; y += yStep) {
+    if (Math.abs(y) < yStep * 0.01) continue; // skip 0
+    const cy = T.toCanvasY(y);
+    const labelX = Math.max(cx0vis - pad, labelPad);
+    ctx.fillText(fmtN(y), labelX, cy);
+  }
+
+  // Origin label
+  if (xMin <= 0 && xMax >= 0 && yMin <= 0 && yMax >= 0) {
+    ctx.textAlign    = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillText('0', T.toCanvasX(0) - pad, T.toCanvasY(0) + pad);
+  }
+}
+
+function drawCurve(ctx, T, xs, ys, color, lw = 2.5) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = lw * devicePixelRatio;
+  ctx.lineJoin    = 'round';
+  ctx.beginPath();
+  let penDown = false;
+  for (let i = 0; i < xs.length; i++) {
+    if (!isFinite(ys[i])) { penDown = false; continue; }
+    const cx = T.toCanvasX(xs[i]);
+    const cy = T.toCanvasY(ys[i]);
+    // Clip jumps (discontinuities)
+    if (penDown && i > 0 && isFinite(ys[i-1]) && Math.abs(cy - T.toCanvasY(ys[i-1])) > T.H * 0.6) {
+      penDown = false;
+    }
+    if (!penDown) { ctx.moveTo(cx, cy); penDown = true; }
+    else ctx.lineTo(cx, cy);
+  }
+  ctx.stroke();
+}
+
+function drawTangentLine(ctx, T, x, slope, fx, color, label) {
+  if (!isFinite(slope) || !isFinite(fx)) return;
+  const x0 = xMin, x1 = xMax;
+  const y0 = fx + slope * (x0 - x);
+  const y1 = fx + slope * (x1 - x);
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5 * devicePixelRatio;
+  ctx.setLineDash([6 * devicePixelRatio, 5 * devicePixelRatio]);
+  ctx.beginPath();
+  ctx.moveTo(T.toCanvasX(x0), T.toCanvasY(y0));
+  ctx.lineTo(T.toCanvasX(x1), T.toCanvasY(y1));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawPoint(ctx, T, x, y, color, r = 5) {
+  if (!isFinite(y)) return;
+  const cx = T.toCanvasX(x), cy = T.toCanvasY(y);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * devicePixelRatio, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 1.5 * devicePixelRatio;
+  ctx.stroke();
+}
+
+function drawCriticalPoints(ctx, T) {
+  criticalPoints.forEach(pt => {
+    const color = (pt.type.includes('max')) ? '#f76a6a' : (pt.type.includes('min')) ? '#6ab4f7' : '#f7e26a';
+    const cx = T.toCanvasX(pt.x);
+    const cy = T.toCanvasY(pt.fx);
+    if (!isFinite(cy)) return;
+
+    // Draw marker
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6 * devicePixelRatio, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5 * devicePixelRatio;
+    ctx.stroke();
+
+    // Label
+    ctx.save();
+    ctx.font = `bold ${10 * devicePixelRatio}px Segoe UI, sans-serif`;
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    const label = pt.type.replace('local ', 'L.').replace('global ', 'G.');
+    ctx.fillText(label, cx, cy - 10 * devicePixelRatio);
+    ctx.restore();
+  });
+}
+
+// Draw vertical cursor line
+function drawCursor(ctx, T) {
+  if (mouseX === null) return;
+  const cx = T.toCanvasX(mouseX);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1 * devicePixelRatio;
+  ctx.setLineDash([4 * devicePixelRatio, 4 * devicePixelRatio]);
+  ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, T.H); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+// ─── Main draw ────────────────────────────────────────────────────────────────
+let transforms = {};
+
+function drawAll() {
+  if (!fn) return;
+
+  // Sample curves
+  const dF  = sampleData(x => evalFn(fn, x));
+  const dF1 = sampleData(x => derivative(fn, x));
+  const dF2 = sampleData(x => derivative2(fn, x));
+
+  // All 4 canvases share the same x/y range — build one transform per canvas
+  const TF   = buildTransform(canvases.f);
+  const TF1a = buildTransform(canvases.f1a);
+  const TF1b = buildTransform(canvases.f1b);
+  const TF2  = buildTransform(canvases.f2);
+  if (!TF || !TF1a || !TF1b || !TF2) return;
+  transforms = { f: TF, f1: TF1a, f1b: TF1b, f2: TF2 };
+
+  // Precompute hover values once
+  const hx   = mouseX !== null ? mouseX : null;
+  const hfx  = hx !== null ? evalFn(fn, hx)       : null;
+  const hf1x = hx !== null ? derivative(fn, hx)   : null;
+  const hf2x = hx !== null ? derivative2(fn, hx)  : null;
+
+  function drawF1Canvas(ctx, T) {
+    drawGrid(ctx, T);
+    drawCurve(ctx, T, dF1.xs, dF1.ys, '#f7a26a');
+    if (hx !== null) {
+      drawTangentLine(ctx, T, hx, hf2x, hf1x, 'rgba(255,255,255,0.8)');
+      drawPoint(ctx, T, hx, hf1x, '#fff');
+      drawCursor(ctx, T);
+    }
+  }
+
+  // ── top-left: f(x)
+  drawGrid(ctxs.f, TF);
+  drawCurve(ctxs.f, TF, dF.xs, dF.ys, '#7c6af7');
+  drawCriticalPoints(ctxs.f, TF);
+  if (hx !== null) {
+    drawTangentLine(ctxs.f, TF, hx, hf1x, hfx, 'rgba(255,255,255,0.8)');
+    drawPoint(ctxs.f, TF, hx, hfx, '#fff');
+    drawCursor(ctxs.f, TF);
+  }
+
+  // ── top-right: f'(x)
+  drawF1Canvas(ctxs.f1a, TF1a);
+
+  // ── bottom-left: f'(x)
+  drawF1Canvas(ctxs.f1b, TF1b);
+
+  // ── bottom-right: f''(x) with concavity shading
+  drawGrid(ctxs.f2, TF2);
+  if (TF2.yMin < 0 && TF2.yMax > 0) {
+    const cy0 = TF2.toCanvasY(0);
+    ctxs.f2.save();
+    for (let i = 1; i < dF2.xs.length; i++) {
+      if (!isFinite(dF2.ys[i]) || !isFinite(dF2.ys[i-1])) continue;
+      const avgY = (dF2.ys[i-1] + dF2.ys[i]) / 2;
+      ctxs.f2.beginPath();
+      ctxs.f2.moveTo(TF2.toCanvasX(dF2.xs[i-1]), TF2.toCanvasY(dF2.ys[i-1]));
+      ctxs.f2.lineTo(TF2.toCanvasX(dF2.xs[i]),   TF2.toCanvasY(dF2.ys[i]));
+      ctxs.f2.lineTo(TF2.toCanvasX(dF2.xs[i]),   cy0);
+      ctxs.f2.lineTo(TF2.toCanvasX(dF2.xs[i-1]), cy0);
+      ctxs.f2.closePath();
+      ctxs.f2.fillStyle = avgY < 0 ? 'rgba(106,247,184,0.08)' : 'rgba(247,162,106,0.10)';
+      ctxs.f2.fill();
+    }
+    ctxs.f2.restore();
+  }
+  drawCurve(ctxs.f2, TF2, dF2.xs, dF2.ys, '#6af7b8');
+  if (hx !== null) {
+    drawPoint(ctxs.f2, TF2, hx, hf2x, '#fff');
+    drawCursor(ctxs.f2, TF2);
+  }
+
+  updateInfoBar();
+}
+
+function updateInfoBar() {
+  if (mouseX === null || !fn) {
+    document.getElementById('info-x').textContent  = '—';
+    document.getElementById('info-f').textContent  = '—';
+    document.getElementById('info-f1').textContent = '—';
+    document.getElementById('info-f2').textContent = '—';
+    document.getElementById('info-note').textContent = 'hover over graphs';
+    return;
+  }
+  const x   = mouseX;
+  const fx  = evalFn(fn, x);
+  const f1x = derivative(fn, x);
+  const f2x = derivative2(fn, x);
+
+  document.getElementById('info-x').textContent  = x.toFixed(4);
+  document.getElementById('info-f').textContent  = isFinite(fx)  ? fx.toFixed(5)  : 'undef';
+  document.getElementById('info-f1').textContent = isFinite(f1x) ? f1x.toFixed(5) : 'undef';
+  document.getElementById('info-f2').textContent = isFinite(f2x) ? f2x.toFixed(5) : 'undef';
+
+  // Interpretation note
+  let note = '';
+  if (isFinite(f1x) && isFinite(f2x)) {
+    const absD1 = Math.abs(f1x);
+    if (absD1 < 0.05) {
+      if (f2x > 0.05)       note = '≈ local/global minimum (f′≈0, f″>0)';
+      else if (f2x < -0.05) note = '≈ local/global maximum (f′≈0, f″<0)';
+      else                  note = '≈ saddle / inflection point (f′≈0, f″≈0)';
+    } else if (f1x > 0) {
+      note = f2x > 0 ? 'increasing, concave up' :
+             f2x < 0 ? 'increasing, concave down' : 'increasing, inflection nearby';
+    } else {
+      note = f2x > 0 ? 'decreasing, concave up' :
+             f2x < 0 ? 'decreasing, concave down' : 'decreasing, inflection nearby';
+    }
+    // Check for inflection (f2 ≈ 0 but f1 ≠ 0)
+    if (Math.abs(f2x) < 0.05 && absD1 > 0.05) note += ' (inflection point)';
+  }
+  document.getElementById('info-note').textContent = note || '—';
+}
+
+// ─── Smooth animation state ───────────────────────────────────────────────────
+let tXMin = xMin, tXMax = xMax; // animation targets
+let rafId = null;
+let criticalsDirty = false;
+let isZooming = false;
+
+function syncRangeInputs() {
+  document.getElementById('x-min').value = xMin.toFixed(2);
+  document.getElementById('x-max').value = xMax.toFixed(2);
+}
+
+function startAnim() {
+  if (rafId) return;
+  rafId = requestAnimationFrame(animStep);
+}
+
+function animStep() {
+  const LERP = 0.10;
+  const d1 = tXMin - xMin, d2 = tXMax - xMax;
+  if (Math.abs(d1) < 1e-6 && Math.abs(d2) < 1e-6) {
+    xMin = tXMin; xMax = tXMax;
+    rafId = null;
+    syncRangeInputs();
+    // Recompute y-bounds once zoom settles (not every frame — that caused flying)
+    if (fn && criticalsDirty) { initYCenters(); criticalPoints = findCriticalPoints(); criticalsDirty = false; }
+    if (fn) drawAll();
+    return;
+  }
+  xMin += d1 * LERP;
+  xMax += d2 * LERP;
+  syncRangeInputs();
+  if (fn) drawAll();
+  rafId = requestAnimationFrame(animStep);
+}
+
+const MIN_RANGE = 0.1;
+const MAX_RANGE = 500;
+
+function zoomAround(centerX, factor) {
+  let newRange = (tXMax - tXMin) * factor;
+  newRange = Math.max(MIN_RANGE, Math.min(MAX_RANGE, newRange));
+  const half = newRange / 2;
+  tXMin = centerX - half;
+  tXMax = centerX + half;
+  criticalsDirty = true;
+  isZooming = true;
+  startAnim();
+}
+
+// ─── Drag-to-pan state ────────────────────────────────────────────────────────
+let isDragging = false;
+let dragStartClientX = 0, dragStartClientY = 0;
+let dragStartXMin = 0, dragStartXMax = 0;
+let dragStartYCenter = 0;
+
+function getDataX(clientX, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const T = transforms.f;
+  if (!T) return null;
+  return T.toDataX((clientX - rect.left) * (canvas.width / rect.width));
+}
+
+// ─── Mouse interaction ────────────────────────────────────────────────────────
+
+function snapToCritical(x) {
+  if (!criticalPoints.length || !transforms.f) return x;
+  const pxPerUnit = transforms.f.W / (xMax - xMin);
+  const SNAP_PX = 12;
+  let best = null, bestDist = Infinity;
+  for (const pt of criticalPoints) {
+    const d = Math.abs(pt.x - x) * pxPerUnit;
+    if (d < SNAP_PX && d < bestDist) { bestDist = d; best = pt; }
+  }
+  return best ? best.x : x;
+}
+
+function updateMouseX(clientX, canvas) {
+  const v = getDataX(clientX, canvas);
+  if (v !== null) mouseX = snapToCritical(v);
+}
+
+Object.values(canvases).forEach(c => {
+  // Hover — read tangent position
+  c.addEventListener('mousemove', e => {
+    if (isDragging) {
+      const rect = c.getBoundingClientRect();
+      const dataPerPx = (dragStartXMax - dragStartXMin) / rect.width;
+      const dx = -(e.clientX - dragStartClientX) * dataPerPx;
+      const dy =  (e.clientY - dragStartClientY) * dataPerPx; // canvas y is flipped
+      tXMin = xMin = dragStartXMin + dx;
+      tXMax = xMax = dragStartXMax + dx;
+      yCenter = dragStartYCenter + dy;
+      syncRangeInputs();
+      if (fn) drawAll();
+      return;
+    }
+    updateMouseX(e.clientX, c);
+    if (fn) drawAll();
+  });
+
+  c.addEventListener('mouseleave', e => {
+    if (isDragging) return;
+    // Don't clear if mouse moved to another one of our canvases
+    if (Object.values(canvases).includes(e.relatedTarget)) return;
+    mouseX = null;
+    if (fn) drawAll();
+  });
+
+  // Drag start
+  c.addEventListener('mousedown', e => {
+    isDragging = true;
+    dragStartClientX = e.clientX;
+    dragStartClientY = e.clientY;
+    dragStartXMin = tXMin;
+    dragStartXMax = tXMax;
+    dragStartYCenter = yCenter;
+    isZooming = false;
+    c.style.cursor = 'grabbing';
+    mouseX = null;
+  });
+
+  // Wheel zoom — small step per tick, direction only
+  c.addEventListener('wheel', e => {
+    e.preventDefault();
+    const cx = getDataX(e.clientX, c);
+    if (cx === null) return;
+    const factor = e.deltaY > 0 ? 1.08 : 0.926;
+    zoomAround(cx, factor);
+  }, { passive: false });
+
+  // Touch pan
+  c.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (!isDragging) updateMouseX(e.touches[0].clientX, c);
+    if (fn) drawAll();
+  }, { passive: false });
+  c.addEventListener('touchend', () => { mouseX = null; if (fn) drawAll(); });
+});
+
+// Global mouseup — end drag from anywhere
+window.addEventListener('mouseup', () => {
+  if (!isDragging) return;
+  isDragging = false;
+  Object.values(canvases).forEach(c => (c.style.cursor = 'crosshair'));
+  criticalsDirty = true;
+  criticalPoints = findCriticalPoints();
+  if (fn) drawAll();
+});
+
+// Prevent text selection while dragging
+window.addEventListener('mousemove', e => {
+  if (isDragging) e.preventDefault();
+});
+
+// ─── Plot trigger ─────────────────────────────────────────────────────────────
+function plot() {
+  const raw = document.getElementById('eq-input').value.trim();
+  const errEl = document.getElementById('error-msg');
+  try {
+    const candidate = parseEquation(raw);
+    // Test it
+    const test = candidate(1, mathScope);
+    fn = candidate;
+    errEl.textContent = '';
+    initYCenters();
+    criticalPoints = findCriticalPoints();
+    drawAll();
+  } catch (err) {
+    errEl.textContent = 'Error: ' + err.message;
+  }
+}
+
+document.getElementById('plot-btn').addEventListener('click', plot);
+document.getElementById('eq-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') plot();
+});
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('eq-input').value = btn.dataset.eq;
+    plot();
+  });
+});
+
+document.getElementById('x-min').addEventListener('change', () => {
+  tXMin = xMin = parseFloat(document.getElementById('x-min').value) || -4;
+  if (fn) { initYCenters(); criticalPoints = findCriticalPoints(); drawAll(); }
+});
+document.getElementById('x-max').addEventListener('change', () => {
+  tXMax = xMax = parseFloat(document.getElementById('x-max').value) || 4;
+  if (fn) { initYCenters(); criticalPoints = findCriticalPoints(); drawAll(); }
+});
+
+const center = () => (tXMin + tXMax) / 2;
+document.getElementById('zoom-in').addEventListener('click',    () => zoomAround(center(), 0.6));
+document.getElementById('zoom-out').addEventListener('click',   () => zoomAround(center(), 1.6));
+document.getElementById('reset-btn').addEventListener('click', () => {
+  tXMin = xMin = -4; tXMax = xMax = 4; yCenter = 0; syncRangeInputs();
+  if (fn) { initYCenters(); criticalPoints = findCriticalPoints(); drawAll(); }
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+resizeAll();
+plot();
+</script>
+</body>
+</html>
